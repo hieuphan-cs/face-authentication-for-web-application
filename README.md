@@ -10,3 +10,5 @@ python -m uvicorn run:app --reload --port 8000
 
 # step 4: open link: http://localhost:8000
 
+## Author
+hieuphan-cs
