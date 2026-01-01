@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Authentication System</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Main App Container -->
+    <div id="app" class="container">
+        <!-- Authentication Page -->
+        <div id="authPage">
+            <div class="header">
+                <h1>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
+                    Face Authentication
+                </h1>
+                <p>Secure login using CNN-based face recognition</p>
+            </div>
+
+            <div class="mode-toggle">
+                <button class="mode-btn active" onclick="switchMode('login')">Login</button>
+                <button class="mode-btn" onclick="switchMode('register')">Register</button>
+            </div>
+
+            <div class="card">
+                <div class="auth-title">
+                    <h2 id="authTitle">Login with Your Face</h2>
+                    <p id="authDesc">Look at the camera to authenticate your identity</p>
+                </div>
+
+                <div class="video-container">
+                    <video id="video" autoplay playsinline></video>
+                    <canvas id="canvas" style="display: none;"></canvas>
+                    
+                    <div id="videoPlaceholder" class="video-placeholder">
+                        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        <button class="btn btn-primary" onclick="startCamera()" style="margin-top: 20px;">
+                            Start Camera
+                        </button>
+                    </div>
+
+                    <div id="videoOverlay" class="video-overlay hidden">
+                        <div class="face-guide"></div>
+                        <div class="liveness-indicator" id="livenessIndicator">
+                            <span>●</span>
+                            <span id="frameCount">0/30 frames</span>
+                        </div>
+                        
+                        <!-- Blink Instruction Overlay -->
+                        <div class="blink-instruction" id="blinkInstruction">
+                            <div class="blink-icon"></div>
+                            <div class="blink-text">Please blink naturally</div>
+                            <div class="blink-subtext">~6 seconds recording</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="progressContainer" class="hidden">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text" id="progressText">Capturing frames: 0/30</div>
+                </div>
+
+                <div id="alertContainer"></div>
+
+                <div id="buttonGroup" class="button-group hidden">
+                    <button class="btn btn-primary" id="captureBtn" onclick="handleCapture()" disabled>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                            <circle cx="12" cy="13" r="4"></circle>
+                        </svg>
+                        <span id="captureBtnText">Authenticate</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="stopCamera()">Cancel</button>
+                </div>
+
+                <div class="info-section">
+                    <h3>How it works:</h3>
+                    <ol>
+                        <li><strong>Face Detection:</strong> MTCNN detects and aligns your face</li>
+                        <li><strong>Feature Extraction:</strong> FaceNet generates a 512D embedding</li>
+                        <li><strong>Blink Detection:</strong> Detects eye blinks to verify you're real</li>
+                        <li><strong>Movement Check:</strong> Analyzes natural facial movements</li>
+                        <li><strong>Verification:</strong> Cosine similarity determines match (60% threshold)</li>
+                    </ol>
+
+                    <div class="security-notice">
+                        <strong>Enhanced Security:</strong> This system uses blink detection to prevent spoofing with photos or videos. Please blink naturally during capture.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Page -->
+        <div id="dashboardPage" class="hidden">
+            <div class="dashboard-header">
+                <div>
+                    <h2 style="margin-bottom: 5px;">Dashboard</h2>
+                    <p style="color: #666;">Welcome back!</p>
+                </div>
+                <button class="btn btn-primary" onclick="logout()">
+                    Logout
+                </button>
+            </div>
+
+            <div class="dashboard-content">
+                <div class="stat-card">
+                    <div class="user-avatar" id="userAvatar">👤</div>
+                    <h2 id="userName" style="margin-bottom: 10px;">User</h2>
+                    <p style="color: #666; margin-bottom: 20px;">Successfully authenticated via face recognition</p>
+                    
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e0e0e0;">
+                            <span style="font-weight: 600;">User ID:</span>
+                            <span id="userId" style="font-family: monospace; font-size: 0.9rem;">-</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e0e0e0;">
+                            <span style="font-weight: 600;">Username:</span>
+                            <span id="userNameDetail">-</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e0e0e0;">
+                            <span style="font-weight: 600;">Auth Type:</span>
+                            <span>Face Recognition (CNN)</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 10px 0;">
+                            <span style="font-weight: 600;">Security Level:</span>
+                            <span style="color: #10b981; font-weight: 600;">High</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <h3 style="margin-bottom: 15px;">Security Features</h3>
+                    <div style="display: grid; gap: 15px;">
+                        <div style="display: flex; gap: 10px;">
+                            <span style="color: #10b981; font-size: 1.2rem;">✓</span>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 3px;">Blink Detection</div>
+                                <div style="color: #666; font-size: 0.9rem;">Detects real eye movements to prevent photo/video spoofing</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <span style="color: #10b981; font-size: 1.2rem;">✓</span>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 3px;">Movement Analysis</div>
+                                <div style="color: #666; font-size: 0.9rem;">Multi-frame analysis prevents static image attacks</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <span style="color: #10b981; font-size: 1.2rem;">✓</span>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 3px;">Encrypted Storage</div>
+                                <div style="color: #666; font-size: 0.9rem;">Face embeddings encrypted at rest</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <span style="color: #10b981; font-size: 1.2rem;">✓</span>
+                            <div>
+                                <div style="font-weight: 600; margin-bottom: 3px;">JWT Authentication</div>
+                                <div style="color: #666; font-size: 0.9rem;">Secure token-based sessions</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'http://localhost:8000/api';
+        const TOTAL_FRAMES = 30;
+        const FRAME_INTERVAL = 200; // ms between frames
+        
+        // State
+        let currentMode = 'login';
+        let stream = null;
+        let livenessFrames = [];
+        let isProcessing = false;
+        let frameInterval = null;
+
+        // Initialize
+        checkAuth();
+
+        function checkAuth() {
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                verifyToken(token);
+            }
+        }
+
+        async function verifyToken(token) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/verify-token`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token })
+                });
+                
+                const data = await response.json();
+                if (data.valid) {
+                    showDashboard(data);
+                }
+            } catch (error) {
+                console.error('Token verification failed:', error);
+            }
+        }
+
+        function switchMode(mode) {
+            currentMode = mode;
+            
+            // Update buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update text
+            if (mode === 'login') {
+                document.getElementById('authTitle').textContent = 'Login with Your Face';
+                document.getElementById('authDesc').textContent = 'Look at the camera and blink naturally';
+                document.getElementById('captureBtnText').textContent = 'Authenticate';
+            } else {
+                document.getElementById('authTitle').textContent = 'Register Your Face';
+                document.getElementById('authDesc').textContent = 'Look at the camera and blink naturally during 6-second capture';
+                document.getElementById('captureBtnText').textContent = 'Capture & Register';
+            }
+            
+            // Reset
+            stopCamera();
+            clearAlert();
+        }
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: 640, height: 480, facingMode: 'user' }
+                });
+                
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                document.getElementById('videoPlaceholder').classList.add('hidden');
+                document.getElementById('videoOverlay').classList.remove('hidden');
+                document.getElementById('buttonGroup').classList.remove('hidden');
+                document.getElementById('progressContainer').classList.remove('hidden');
+                
+                // Show blink instruction
+                showBlinkInstruction();
+
+                // Start capturing liveness frames
+                startLivenessCapture();
+                
+            } catch (error) {
+                showAlert('Failed to access camera. Please grant permissions.', 'error');
+            }
+        }
+
+        function showBlinkInstruction() {
+            const instruction = document.getElementById('blinkInstruction');
+            instruction.classList.add('blink-pulse');
+
+            // Keep visible for first 2 seconds, then fade
+            setTimeout(() => {
+                instruction.style.opacity = '0.3';
+            }, 2000);
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            if (frameInterval) {
+                clearInterval(frameInterval);
+                frameInterval = null;
+            }
+            
+            livenessFrames = [];
+            document.getElementById('videoPlaceholder').classList.remove('hidden');
+            document.getElementById('videoOverlay').classList.add('hidden');
+            document.getElementById('buttonGroup').classList.add('hidden');
+            document.getElementById('progressContainer').classList.add('hidden');
+            document.getElementById('captureBtn').disabled = true;
+            document.getElementById('blinkInstruction').style.opacity = '1';
+            updateProgress(0);
+        }
+
+        function startLivenessCapture() {
+            livenessFrames = [];
+            let frameCount = 0;
+            
+            frameInterval = setInterval(() => {
+                if (frameCount < TOTAL_FRAMES) {
+                    const frame = captureFrame();
+                    if (frame) {
+                        livenessFrames.push(frame);
+                        frameCount++;
+                        updateProgress(frameCount);
+
+                        const secondsElapsed = (frameCount * FRAME_INTERVAL / 1000).toFixed(1);
+                        document.getElementById('frameCount').textContent = `${frameCount}/${TOTAL_FRAMES} frames`;
+                        document.getElementById('progressText').textContent = 
+                            `Recording: ${secondsElapsed}s / 6s - Please blink naturally`;
+                        
+                        if (frameCount >= TOTAL_FRAMES) {
+                            document.getElementById('captureBtn').disabled = false;
+                            document.getElementById('progressText').textContent = 
+                                'Recording complete! Click Authenticate button';
+                            document.getElementById('progressText').style.color = '#10b981';
+                        }
+                    }
+                } else {
+                    clearInterval(frameInterval);
+                }
+            }, FRAME_INTERVAL);
+        }
+
+        function captureFrame() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            
+            if (video.readyState === 4) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0);
+                return canvas.toDataURL('image/jpeg', 0.8);
+            }
+            return null;
+        }
+
+        function updateProgress(count) {
+            const percent = (count / TOTAL_FRAMES) * 100;
+            document.getElementById('progressFill').style.width = `${percent}%`;
+        }
+
+        async function handleCapture() {
+            if (isProcessing) return;
+            
+            isProcessing = true;
+            document.getElementById('captureBtn').disabled = true;
+            clearAlert();
+            
+            try {
+                // Check liveness with blink detection
+                if (livenessFrames.length >= TOTAL_FRAMES) {
+                    showAlert(`Analyzing ${livenessFrames.length} frames for liveness and blink detection...`, 'info');
+                    const livenessResult = await checkLiveness(livenessFrames);
+                    
+                    if (!livenessResult.is_live) {
+                        let reason = livenessResult.reason || 'Liveness check failed';
+                        
+                        // Detail notification
+                        if (reason.includes('blink')) {
+                            reason += ' - Please blink naturally during the 6-second recording.';
+                        }
+                        
+                        showAlert(reason, 'error');
+                        isProcessing = false;
+                        document.getElementById('captureBtn').disabled = false;
+                        return;
+                    }
+                    
+                    // Result of liveness detection
+                    const details = livenessResult.details || {};
+                    const blinkInfo = details.blink || {};
+                    const blinks = blinkInfo.blinks || 0;
+                    
+                    console.log('Liveness passed:', livenessResult);
+                    console.log('Blinks detected:', blinks);
+                    
+                    if (blinks > 0) {
+                        showAlert(`Great! Detected ${blinks} blink(s). Proceeding with authentication...`, 'info');
+                    }
+                }
+                
+                const imageData = captureFrame();
+                if (!imageData) {
+                    throw new Error('Failed to capture image');
+                }
+                
+                if (currentMode === 'register') {
+                    await handleRegister(imageData);
+                } else {
+                    await handleLogin(imageData);
+                }
+                
+            } catch (error) {
+                showAlert(error.message || 'Operation failed', 'error');
+                document.getElementById('captureBtn').disabled = false;
+            } finally {
+                isProcessing = false;
+            }
+        }
+
+        async function handleRegister(imageData) {
+            const username = prompt('Enter your username:');
+            if (!username) {
+                document.getElementById('captureBtn').disabled = false;
+                return;
+            }
+
+            const email = prompt('Enter your email (optional):') || '';
+            
+            showAlert('Processing face data...', 'info');
+            
+            const response = await fetch(`${API_BASE_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, image: imageData })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                localStorage.setItem('authToken', data.token);
+                showAlert(`Welcome, ${username}! Registration successful.`, 'success');
+                setTimeout(() => showDashboard(data), 1500);
+            } else {
+                throw new Error(data.error || 'Registration failed');
+            }
+        }
+
+        async function handleLogin(imageData) {
+            showAlert('Authenticating...', 'info');
+            
+            const response = await fetch(`${API_BASE_URL}/authenticate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: imageData })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                localStorage.setItem('authToken', data.token);
+                const similarity = (data.similarity * 100).toFixed(1);
+                showAlert(`Welcome back, ${data.username}! (Similarity: ${similarity}%)`, 'success');
+                setTimeout(() => showDashboard(data), 1500);
+            } else {
+                throw new Error(data.error || 'Authentication failed');
+            }
+        }
+
+        async function checkLiveness(frames) {
+            const response = await fetch(`${API_BASE_URL}/liveness-check`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ frames })
+            });
+            
+            return await response.json();
+        }
+
+        function showDashboard(userData) {
+            stopCamera();
+            document.getElementById('authPage').classList.add('hidden');
+            document.getElementById('dashboardPage').classList.remove('hidden');
+            
+            document.getElementById('userName').textContent = userData.username;
+            document.getElementById('userNameDetail').textContent = userData.username;
+            document.getElementById('userId').textContent = userData.user_id;
+            document.getElementById('userAvatar').textContent = userData.username.charAt(0).toUpperCase();
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            document.getElementById('authPage').classList.remove('hidden');
+            document.getElementById('dashboardPage').classList.add('hidden');
+            showAlert('Logged out successfully', 'success');
+        }
+
+        function showAlert(message, type) {
+            const container = document.getElementById('alertContainer');
+            const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+            
+            container.innerHTML = `
+                <div class="alert alert-${type}">
+                    <span style="font-size: 1.2rem;">${icon}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+        }
+
+        function clearAlert() {
+            document.getElementById('alertContainer').innerHTML = '';
+        }
+    </script>
+</body>
+</html>
